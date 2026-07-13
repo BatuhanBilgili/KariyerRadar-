@@ -68,6 +68,9 @@ export default function DashboardPage() {
   const [timezone, setTimezone] = useState("Europe/Istanbul");
   const [keywords, setKeywords] = useState<string[]>(["Software Engineer"]);
   const [keywordInput, setKeywordInput] = useState("");
+  const [locations, setLocations] = useState<string[]>([]);
+  const [locationInput, setLocationInput] = useState("");
+  const [fetchAllUniv, setFetchAllUniv] = useState(false);
   const [workTypes, setWorkTypes] = useState<WorkType[]>(["remote", "hybrid", "onsite"]);
   const [platforms, setPlatforms] = useState<Platform[]>(["linkedin"]);
   const [githubUrl, setGithubUrl] = useState("");
@@ -92,6 +95,11 @@ export default function DashboardPage() {
       
       const savedKeywords = localStorage.getItem("tr_keywords");
       if (savedKeywords) setKeywords(JSON.parse(savedKeywords));
+
+      const savedLocations = localStorage.getItem("tr_locations");
+      if (savedLocations) setLocations(JSON.parse(savedLocations));
+
+      setFetchAllUniv(localStorage.getItem("tr_fetch_all_univ") === "true");
 
       const savedWorkTypes = localStorage.getItem("tr_work_types");
       if (savedWorkTypes) setWorkTypes(JSON.parse(savedWorkTypes));
@@ -130,6 +138,32 @@ export default function DashboardPage() {
     }
     if (e.key === "Backspace" && !keywordInput && keywords.length > 0) {
       setKeywords((prev) => prev.slice(0, -1));
+    }
+  };
+
+  // Location handlers
+  const addLocation = useCallback(
+    (loc: string) => {
+      const trimmed = loc.trim();
+      if (trimmed && !locations.includes(trimmed)) {
+        setLocations((prev) => [...prev, trimmed]);
+      }
+      setLocationInput("");
+    },
+    [locations]
+  );
+
+  const removeLocation = useCallback((loc: string) => {
+    setLocations((prev) => prev.filter((l) => l !== loc));
+  }, []);
+
+  const handleLocationKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter" || e.key === ",") {
+      e.preventDefault();
+      addLocation(locationInput);
+    }
+    if (e.key === "Backspace" && !locationInput && locations.length > 0) {
+      setLocations((prev) => prev.slice(0, -1));
     }
   };
 
@@ -237,6 +271,8 @@ export default function DashboardPage() {
         notification_time: notifTime,
         timezone: timezone,
         search_keywords: keywords,
+        locations: locations,
+        fetch_all_univ: fetchAllUniv,
         work_types: workTypes,
         platforms: platforms,
         github_url: githubUrl || null,
@@ -265,6 +301,8 @@ export default function DashboardPage() {
       localStorage.setItem("tr_notif_time", notifTime);
       localStorage.setItem("tr_timezone", timezone);
       localStorage.setItem("tr_keywords", JSON.stringify(keywords));
+      localStorage.setItem("tr_locations", JSON.stringify(locations));
+      localStorage.setItem("tr_fetch_all_univ", String(fetchAllUniv));
       localStorage.setItem("tr_work_types", JSON.stringify(workTypes));
       localStorage.setItem("tr_platforms", JSON.stringify(platforms));
       localStorage.setItem("tr_github_url", githubUrl);
@@ -560,6 +598,25 @@ export default function DashboardPage() {
                     </div>
                   </div>
 
+                  {/* Tüm Üniversite İlanları */}
+                  {(platforms.includes("itu") || platforms.includes("bogazici")) && (
+                    <div className="form-group" style={{ marginTop: "1rem" }}>
+                      <div className="checkbox-item" style={{ alignItems: "flex-start", background: "rgba(100,200,255,0.1)", padding: "10px", borderRadius: "8px" }}>
+                        <input
+                          type="checkbox"
+                          id="fetch-all-univ"
+                          checked={fetchAllUniv}
+                          onChange={(e) => setFetchAllUniv(e.target.checked)}
+                          style={{ marginTop: "4px" }}
+                        />
+                        <label className="checkbox-label" htmlFor="fetch-all-univ" style={{ fontSize: "0.9rem", lineHeight: "1.4" }}>
+                          <strong>Üniversite Portallarındaki (İTÜ, Boğaziçi) Tüm Yeni İlanları Getir</strong><br/>
+                          <span style={{ opacity: 0.8, fontSize: "0.8rem" }}>Bu seçenek aktifken, İTÜ ve Boğaziçi'ndeki tüm taze fırsatlar arama kelimenize bakılmaksızın (filtresiz) getirilir. LinkedIn ve Indeed için arama kelimeleriniz geçerli olmaya devam eder.</span>
+                        </label>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Çalışma Tipi */}
                   <div className="form-group">
                     <label className="form-label">Çalışma Tipi (min. 1)</label>
@@ -577,6 +634,34 @@ export default function DashboardPage() {
                           </label>
                         </div>
                       ))}
+                    </div>
+                  </div>
+
+                  {/* Şehir / Ülke Seçimi */}
+                  <div className="form-group">
+                    <label className="form-label">Konumlar (Örn: Türkiye, İstanbul, Remote)</label>
+                    <div className="tags-container">
+                      {locations.map((loc) => (
+                        <span key={loc} className="tag">
+                          {loc}
+                          <button
+                            className="tag-remove"
+                            onClick={() => removeLocation(loc)}
+                            type="button"
+                            aria-label={`${loc} kaldır`}
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ))}
+                      <input
+                        type="text"
+                        className="tags-input"
+                        placeholder={locations.length === 0 ? "Bir konum yazın ve Enter'a basın..." : ""}
+                        value={locationInput}
+                        onChange={(e) => setLocationInput(e.target.value)}
+                        onKeyDown={handleLocationKeyDown}
+                      />
                     </div>
                   </div>
 

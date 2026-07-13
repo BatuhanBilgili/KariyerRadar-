@@ -18,6 +18,8 @@ CREATE TABLE IF NOT EXISTS users (
     notification_time TEXT NOT NULL DEFAULT '09:00',
     timezone TEXT NOT NULL DEFAULT 'Europe/Istanbul',
     search_keywords TEXT[] NOT NULL DEFAULT '{}',
+    locations TEXT[] NOT NULL DEFAULT '{}',
+    fetch_all_univ BOOLEAN NOT NULL DEFAULT false,
     work_types TEXT[] NOT NULL DEFAULT '{remote, hybrid, onsite}',
     platforms TEXT[] NOT NULL DEFAULT '{linkedin}',
     -- Kullanıcı profil bilgileri (AI CV Builder için)

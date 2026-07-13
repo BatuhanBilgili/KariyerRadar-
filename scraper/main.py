@@ -115,6 +115,8 @@ def process_user(client, user: dict):
     user_id = user["id"]
     user_keywords = user.get("search_keywords", [])
     user_platforms = user.get("platforms", ["linkedin"])
+    user_locations = user.get("locations", [])
+    fetch_all_univ = user.get("fetch_all_univ", False)
     user_work_types = user.get("work_types", ["remote", "hybrid", "onsite"])
     notif_method = user.get("notification_method", "telegram")
     telegram_id = user.get("telegram_chat_id")
@@ -122,11 +124,13 @@ def process_user(client, user: dict):
 
     logger.info(f"\n--- Kullanıcı: {user_id} ---")
     logger.info(f"  Keywords: {user_keywords}")
+    logger.info(f"  Locations: {user_locations}")
     logger.info(f"  Platforms: {user_platforms}")
     logger.info(f"  Work Types: {user_work_types}")
+    logger.info(f"  Fetch All Univ: {fetch_all_univ}")
     logger.info(f"  Notification: {notif_method}")
 
-    if not user_keywords:
+    if not user_keywords and not fetch_all_univ:
         logger.warning(f"  ⚠️ Kullanıcının arama kelimesi yok, atlanıyor.")
         return
 
@@ -149,10 +153,11 @@ def process_user(client, user: dict):
         try:
             # İlanları çek
             if platform in ("linkedin", "indeed"):
-                jobs = scraper_fn(keywords=user_keywords)
+                jobs = scraper_fn(keywords=user_keywords, locations=user_locations)
             else:
-                # İTÜ ve Boğaziçi — keyword filtresi scraper içinde
-                jobs = scraper_fn(keywords=user_keywords)
+                # İTÜ ve Boğaziçi
+                univ_keywords = [] if fetch_all_univ else user_keywords
+                jobs = scraper_fn(keywords=univ_keywords)
 
             # Work type filtresi
             if user_work_types:

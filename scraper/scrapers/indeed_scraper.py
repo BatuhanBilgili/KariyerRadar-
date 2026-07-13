@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 def scrape_indeed(
     keywords: list[str],
-    location: str = "",
+    locations: list[str] | None = None,
     results_wanted: int = 25,
     country: str = "Turkey",
 ) -> list[dict]:
@@ -26,21 +26,25 @@ def scrape_indeed(
 
     all_jobs = []
 
+    # Varsayılan olarak boş liste gelirse "Tüm lokasyonlar" (None) yap
+    loc_list = locations if locations and len(locations) > 0 else [None]
+
     for keyword in keywords:
-        try:
-            logger.info(f"Indeed'de aranan: '{keyword}'")
+        for loc in loc_list:
+            try:
+                logger.info(f"Indeed'de aranan: '{keyword}' (Konum: {loc or 'Global'})")
 
-            jobs_df = scrape_jobs(
-                site_name=["indeed"],
-                search_term=keyword,
-                location=location if location else None,
-                results_wanted=results_wanted,
-                hours_old=24,
-                country_indeed=country,
-            )
+                jobs_df = scrape_jobs(
+                    site_name=["indeed"],
+                    search_term=keyword,
+                    location=loc,
+                    results_wanted=results_wanted,
+                    hours_old=24,
+                    country_indeed=country,
+                )
 
-            if jobs_df is None or jobs_df.empty:
-                logger.info(f"Indeed'de '{keyword}' için sonuç bulunamadı.")
+                if jobs_df is None or jobs_df.empty:
+                    logger.info(f"Indeed'de '{keyword}' ({loc or 'Global'}) için sonuç bulunamadı.")
                 continue
 
             for _, row in jobs_df.iterrows():
