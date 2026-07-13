@@ -1,0 +1,22 @@
+# Ignore markdown files as requested
+*.md
+
+# Node/Next.js
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/.env
+frontend/.env.local
+frontend/.env.development.local
+frontend/.env.test.local
+frontend/.env.production.local
+
+# Python
+scraper/__pycache__/
+scraper/*.pyc
+scraper/.env
+scraper/venv/
+scraper/env/
+
+# OS
+.DS_Store

@@ -1,0 +1,282 @@
+"""
+TalentRadar — Ana Scraper Orchestrator
+GitHub Actions cron ile çalışır.
+
+Akış:
+1. Supabase'den tüm kullanıcıları çek
+2. Her kullanıcı için:
+   a. Seçili platformlarda arama kelimelerine göre ilanları tara
+   b. Work type filtresini uygula
+   c. DB'de daha önce gönderilmiş mi kontrol et
+   d. Yeni ilanlar varsa → Gemini ile özet oluştur
+   e. Telegram/E-posta ile bildirim gönder
+   f. sent_notifications tablosuna kaydet
+3. Yeni ilan yoksa → platform için "ilan bulunamadı" mesajı
+"""
+
+import os
+import sys
+import logging
+from datetime import datetime, timezone
+from dotenv import load_dotenv
+
+# .env dosyasını yükle (lokal geliştirme için)
+load_dotenv()
+
+# Logging ayarları
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s — %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+logger = logging.getLogger("KariyerRadarı")
+
+# Import'lar
+from db.supabase_client import (
+    get_supabase_client,
+    get_all_users,
+    upsert_job_listing,
+    get_sent_job_ids_for_user,
+    record_sent_notification,
+    cleanup_old_data,
+)
+from scrapers.linkedin_scraper import scrape_linkedin
+from scrapers.indeed_scraper import scrape_indeed
+from scrapers.itu_scraper import scrape_itu
+from scrapers.bogazici_scraper import scrape_bogazici
+from ai.summarizer import batch_summarize_jobs
+from notifiers.telegram_notifier import send_telegram_message, format_job_notification
+from notifiers.email_notifier import send_email_notification, format_email_html
+
+
+# Platform → scraper fonksiyonu eşleştirmesi
+PLATFORM_SCRAPERS = {
+    "linkedin": scrape_linkedin,
+    "indeed": scrape_indeed,
+    "itu": scrape_itu,
+    "bogazici": scrape_bogazici,
+}
+
+# Platform → görüntüleme adı
+PLATFORM_DISPLAY = {
+    "linkedin": "LinkedIn",
+    "indeed": "Indeed",
+    "itu": "İTÜ Arı Teknokent",
+    "bogazici": "Boğaziçi Kariyer",
+}
+
+
+def main():
+    """Ana çalışma fonksiyonu."""
+    logger.info("=" * 60)
+    logger.info("KariyerRadarı — Scraper başlatıldı")
+    logger.info(f"Zaman: {datetime.now(timezone.utc).isoformat()}")
+    logger.info("=" * 60)
+
+    # Supabase bağlantısı
+    try:
+        client = get_supabase_client()
+        logger.info("✅ Supabase bağlantısı başarılı")
+    except Exception as e:
+        logger.error(f"❌ Supabase bağlantı hatası: {e}")
+        sys.exit(1)
+
+    # Kullanıcıları çek
+    users = get_all_users(client)
+    if not users:
+        logger.warning("⚠️ Hiç kullanıcı bulunamadı!")
+        return
+    logger.info(f"👥 {len(users)} kullanıcı bulundu.")
+
+    # Her kullanıcı için işlem
+    for user in users:
+        try:
+            process_user(client, user)
+        except Exception as e:
+            logger.error(
+                f"❌ Kullanıcı işleme hatası (ID: {user.get('id', '?')}): {e}"
+            )
+            continue
+
+    # Temizlik Aşaması: 30 günden eski ilanları hafızadan ve veritabanından sil
+    logger.info("🧹 Temizlik aşaması başlatılıyor (30 günden eski ilanlar)...")
+    try:
+        cleanup_old_data(client, days_old=30)
+    except Exception as e:
+        logger.error(f"❌ Temizlik hatası: {e}")
+
+    logger.info("=" * 60)
+    logger.info("KariyerRadarı — Scraper tamamlandı")
+    logger.info("=" * 60)
+
+
+def process_user(client, user: dict):
+    """Tek bir kullanıcı için tam scraping ve bildirim akışı."""
+    user_id = user["id"]
+    user_keywords = user.get("search_keywords", [])
+    user_platforms = user.get("platforms", ["linkedin"])
+    user_work_types = user.get("work_types", ["remote", "hybrid", "onsite"])
+    notif_method = user.get("notification_method", "telegram")
+    telegram_id = user.get("telegram_chat_id")
+    email = user.get("email")
+
+    logger.info(f"\n--- Kullanıcı: {user_id} ---")
+    logger.info(f"  Keywords: {user_keywords}")
+    logger.info(f"  Platforms: {user_platforms}")
+    logger.info(f"  Work Types: {user_work_types}")
+    logger.info(f"  Notification: {notif_method}")
+
+    if not user_keywords:
+        logger.warning(f"  ⚠️ Kullanıcının arama kelimesi yok, atlanıyor.")
+        return
+
+    # Daha önce gönderilmiş ilanların ID'lerini al
+    sent_job_ids = get_sent_job_ids_for_user(client, user_id)
+    logger.info(f"  📦 Daha önce gönderilen ilan sayısı: {len(sent_job_ids)}")
+
+    # Her platform için ilanları çek
+    new_jobs_by_platform: dict[str, list[dict]] = {}
+    no_results_platforms: list[str] = []
+
+    for platform in user_platforms:
+        scraper_fn = PLATFORM_SCRAPERS.get(platform)
+        if not scraper_fn:
+            logger.warning(f"  ⚠️ Bilinmeyen platform: {platform}")
+            continue
+
+        platform_display = PLATFORM_DISPLAY.get(platform, platform)
+
+        try:
+            # İlanları çek
+            if platform in ("linkedin", "indeed"):
+                jobs = scraper_fn(keywords=user_keywords)
+            else:
+                # İTÜ ve Boğaziçi — keyword filtresi scraper içinde
+                jobs = scraper_fn(keywords=user_keywords)
+
+            # Work type filtresi
+            if user_work_types:
+                jobs = [
+                    j
+                    for j in jobs
+                    if j.get("work_type", "unknown") in user_work_types
+                    or j.get("work_type") == "unknown"
+                ]
+
+            # İlanları DB'ye kaydet
+            for job in jobs:
+                upsert_job_listing(client, job)
+
+            # Daha önce gönderilmemiş ilanları filtrele
+            new_jobs = [j for j in jobs if j.get("id") not in sent_job_ids]
+
+            # External ID bazında da kontrol et
+            new_jobs = _filter_by_external_id(new_jobs, sent_job_ids, client, user_id)
+
+            if new_jobs:
+                logger.info(
+                    f"  ✅ {platform_display}: {len(new_jobs)} yeni ilan"
+                )
+                new_jobs_by_platform[platform_display] = new_jobs
+            else:
+                logger.info(
+                    f"  📭 {platform_display}: Yeni ilan bulunamadı"
+                )
+                no_results_platforms.append(platform_display)
+
+        except Exception as e:
+            logger.error(f"  ❌ {platform_display} scraping hatası: {e}")
+            no_results_platforms.append(platform_display)
+
+    # Hiç yeni ilan yoksa bile bildirim gönder
+    all_new_jobs = [
+        job for jobs in new_jobs_by_platform.values() for job in jobs
+    ]
+
+    if all_new_jobs:
+        # AI özetleri oluştur
+        logger.info(f"  🤖 {len(all_new_jobs)} ilan için AI özeti oluşturuluyor...")
+        all_new_jobs = batch_summarize_jobs(all_new_jobs)
+
+        # Özetleri platform dict'ine geri yaz
+        idx = 0
+        for platform_name in new_jobs_by_platform:
+            for i in range(len(new_jobs_by_platform[platform_name])):
+                if idx < len(all_new_jobs):
+                    new_jobs_by_platform[platform_name][i] = all_new_jobs[idx]
+                    idx += 1
+
+    # Website/Dashboard URL'sini al ve ilanlara ekle
+    website_url = os.environ.get("WEBSITE_URL", "http://localhost:3000")
+    for platform_name in new_jobs_by_platform:
+        for job in new_jobs_by_platform[platform_name]:
+            job['cv_builder_url'] = f"{website_url.rstrip('/')}/cv-builder/?jobId={job['id']}"
+
+    # Bildirim gönder
+    _send_notifications(
+        user=user,
+        jobs_by_platform=new_jobs_by_platform,
+        no_results_platforms=no_results_platforms,
+        notif_method=notif_method,
+        telegram_id=telegram_id,
+        email=email,
+    )
+
+    # Gönderilen ilanları kaydet
+    for platform_name, jobs in new_jobs_by_platform.items():
+        for job in jobs:
+            if notif_method in ("telegram", "both") and telegram_id:
+                record_sent_notification(client, user_id, job["id"], "telegram")
+            if notif_method in ("email", "both") and email:
+                record_sent_notification(client, user_id, job["id"], "email")
+
+
+def _filter_by_external_id(
+    jobs: list[dict], sent_job_ids: set, client, user_id: str
+) -> list[dict]:
+    """
+    DB'deki sent_notifications ile cross-check yaparak
+    aynı external_id'ye sahip ilanları filtreler.
+    """
+    # Şimdilik basit ID filtresi kullanıyoruz
+    # İleride external_id bazında daha sofistike kontrol eklenebilir
+    return jobs
+
+
+def _send_notifications(
+    user: dict,
+    jobs_by_platform: dict[str, list[dict]],
+    no_results_platforms: list[str],
+    notif_method: str,
+    telegram_id: str | None,
+    email: str | None,
+):
+    """Kullanıcıya bildirim gönderir."""
+
+    # Telegram
+    if notif_method in ("telegram", "both") and telegram_id:
+        message = format_job_notification(jobs_by_platform, no_results_platforms)
+        success = send_telegram_message(chat_id=telegram_id, message=message)
+        if success:
+            logger.info("  📱 Telegram bildirimi gönderildi")
+        else:
+            logger.error("  ❌ Telegram bildirimi gönderilemedi")
+
+    # E-posta
+    if notif_method in ("email", "both") and email:
+        total = sum(len(jobs) for jobs in jobs_by_platform.values())
+        subject = f"KariyerRadarı — {total} Yeni İş İlanı" if total > 0 else "KariyerRadarı — Günlük Rapor"
+        html_body = format_email_html(jobs_by_platform, no_results_platforms)
+        success = send_email_notification(
+            to_email=email,
+            subject=subject,
+            html_body=html_body,
+        )
+        if success:
+            logger.info("  📧 E-posta bildirimi gönderildi")
+        else:
+            logger.error("  ❌ E-posta bildirimi gönderilemedi")
+
+
+if __name__ == "__main__":
+    main()
