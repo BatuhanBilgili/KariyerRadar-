@@ -118,9 +118,15 @@ def format_job_notification(
                 )
 
             if job.get("cv_builder_url"):
-                lines.append(
-                    f'<a href="{job["cv_builder_url"]}">Bu İlan İçin CV/Kapak Mektubu Oluştur</a>'
-                )
+                cv_url = job["cv_builder_url"]
+                if "localhost" in cv_url:
+                    lines.append(
+                        f'<b>CV/Kapak Mektubu:</b> <code>{cv_url}</code>\n<i>(Linki kopyalayıp tarayıcınızda açın)</i>'
+                    )
+                else:
+                    lines.append(
+                        f'<a href="{cv_url}">Bu İlan İçin CV/Kapak Mektubu Oluştur</a>'
+                    )
 
             if job.get("ai_summary"):
                 lines.append(f'\n<b>AI Özet:</b> {job["ai_summary"]}')
