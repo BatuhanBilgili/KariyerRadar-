@@ -59,6 +59,15 @@ const DEMO_JOBS: JobListing[] = [
   },
 ];
 
+const EXPERIENCE_LEVEL_INFO = {
+  internship: "Stajyer",
+  entry: "Başlangıç Seviye",
+  associate: "Uzman",
+  mid_senior: "Orta-Üst Düzey Yönetici",
+  director: "Direktör",
+  executive: "Üst Düzey Yönetici",
+};
+
 export default function DashboardPage() {
   // Settings state
   const [email, setEmail] = useState("");
@@ -71,6 +80,7 @@ export default function DashboardPage() {
   const [locations, setLocations] = useState<string[]>([]);
   const [locationInput, setLocationInput] = useState("");
   const [fetchAllUniv, setFetchAllUniv] = useState(false);
+  const [experienceLevels, setExperienceLevels] = useState<string[]>([]);
   const [workTypes, setWorkTypes] = useState<WorkType[]>(["remote", "hybrid", "onsite"]);
   const [platforms, setPlatforms] = useState<Platform[]>(["linkedin"]);
   const [githubUrl, setGithubUrl] = useState("");
@@ -106,6 +116,9 @@ export default function DashboardPage() {
 
       const savedPlatforms = localStorage.getItem("tr_platforms");
       if (savedPlatforms) setPlatforms(JSON.parse(savedPlatforms));
+
+      const savedExpLevels = localStorage.getItem("tr_experience_levels");
+      if (savedExpLevels) setExperienceLevels(JSON.parse(savedExpLevels));
 
       setGithubUrl(localStorage.getItem("tr_github_url") || "");
       setKaggleUrl(localStorage.getItem("tr_kaggle_url") || "");
@@ -186,6 +199,16 @@ export default function DashboardPage() {
         return prev.filter((pl) => pl !== p);
       }
       return [...prev, p];
+    });
+  };
+
+  // Experience level toggle
+  const toggleExperienceLevel = (level: string) => {
+    setExperienceLevels((prev) => {
+      if (prev.includes(level)) {
+        return prev.filter((l) => l !== level);
+      }
+      return [...prev, level];
     });
   };
 
@@ -273,6 +296,7 @@ export default function DashboardPage() {
         search_keywords: keywords,
         locations: locations,
         fetch_all_univ: fetchAllUniv,
+        experience_levels: experienceLevels,
         work_types: workTypes,
         platforms: platforms,
         github_url: githubUrl || null,
@@ -303,6 +327,7 @@ export default function DashboardPage() {
       localStorage.setItem("tr_keywords", JSON.stringify(keywords));
       localStorage.setItem("tr_locations", JSON.stringify(locations));
       localStorage.setItem("tr_fetch_all_univ", String(fetchAllUniv));
+      localStorage.setItem("tr_experience_levels", JSON.stringify(experienceLevels));
       localStorage.setItem("tr_work_types", JSON.stringify(workTypes));
       localStorage.setItem("tr_platforms", JSON.stringify(platforms));
       localStorage.setItem("tr_github_url", githubUrl);
@@ -597,6 +622,28 @@ export default function DashboardPage() {
                       ))}
                     </div>
                   </div>
+
+                  {/* LinkedIn Deneyim Düzeyi */}
+                  {platforms.includes("linkedin") && (
+                    <div className="form-group" style={{ marginTop: "1rem" }}>
+                      <label className="form-label">Deneyim Düzeyi (Sadece LinkedIn)</label>
+                      <div className="checkbox-group">
+                        {Object.entries(EXPERIENCE_LEVEL_INFO).map(([level, label]) => (
+                          <div className="checkbox-item" key={level}>
+                            <input
+                              type="checkbox"
+                              id={`exp-${level}`}
+                              checked={experienceLevels.includes(level)}
+                              onChange={() => toggleExperienceLevel(level)}
+                            />
+                            <label className="checkbox-label" htmlFor={`exp-${level}`}>
+                              {label}
+                            </label>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Tüm Üniversite İlanları */}
                   {(platforms.includes("itu") || platforms.includes("bogazici")) && (

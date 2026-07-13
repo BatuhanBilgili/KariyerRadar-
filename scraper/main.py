@@ -117,6 +117,7 @@ def process_user(client, user: dict):
     user_platforms = user.get("platforms", ["linkedin"])
     user_locations = user.get("locations", [])
     fetch_all_univ = user.get("fetch_all_univ", False)
+    user_experience_levels = user.get("experience_levels", [])
     user_work_types = user.get("work_types", ["remote", "hybrid", "onsite"])
     notif_method = user.get("notification_method", "telegram")
     telegram_id = user.get("telegram_chat_id")
@@ -126,6 +127,7 @@ def process_user(client, user: dict):
     logger.info(f"  Keywords: {user_keywords}")
     logger.info(f"  Locations: {user_locations}")
     logger.info(f"  Platforms: {user_platforms}")
+    logger.info(f"  Experience Levels: {user_experience_levels}")
     logger.info(f"  Work Types: {user_work_types}")
     logger.info(f"  Fetch All Univ: {fetch_all_univ}")
     logger.info(f"  Notification: {notif_method}")
@@ -152,7 +154,14 @@ def process_user(client, user: dict):
 
         try:
             # İlanları çek
-            if platform in ("linkedin", "indeed"):
+            if platform == "linkedin":
+                jobs = scraper_fn(
+                    keywords=user_keywords,
+                    locations=user_locations,
+                    experience_levels=user_experience_levels,
+                    work_types=user_work_types
+                )
+            elif platform == "indeed":
                 jobs = scraper_fn(keywords=user_keywords, locations=user_locations)
             else:
                 # İTÜ ve Boğaziçi

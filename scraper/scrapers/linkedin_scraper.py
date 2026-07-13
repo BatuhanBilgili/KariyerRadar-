@@ -9,10 +9,69 @@ from datetime import datetime, timezone
 logger = logging.getLogger(__name__)
 
 
+# Monkeypatch LinkedIn scraper class to support f_E and f_WT filters
+_patched = False
+
+def _apply_monkeypatch():
+    global _patched
+    if _patched:
+        return
+    try:
+        import jobspy.linkedin
+        original_init = jobspy.linkedin.LinkedIn.__init__
+
+        def patched_init(self, *args, **kwargs):
+            original_init(self, *args, **kwargs)
+            original_get = self.session.get
+
+            def patched_get(url, *args, **kwargs):
+                if "seeMoreJobPostings/search" in url and "params" in kwargs:
+                    # Inject experience levels (f_E)
+                    exp_levels = getattr(jobspy.linkedin.LinkedIn, "_current_experience_levels", [])
+                    if exp_levels:
+                        mapping = {
+                            "internship": "1",
+                            "entry": "2",
+                            "associate": "3",
+                            "mid_senior": "4",
+                            "director": "5",
+                            "executive": "6"
+                        }
+                        mapped_levels = [mapping[lvl] for lvl in exp_levels if lvl in mapping]
+                        if mapped_levels:
+                            kwargs["params"]["f_E"] = ",".join(mapped_levels)
+                            logger.info(f"Injecting LinkedIn Experience Level filter: f_E={kwargs['params']['f_E']}")
+
+                    # Inject work types (f_WT)
+                    w_types = getattr(jobspy.linkedin.LinkedIn, "_current_work_types", [])
+                    if w_types:
+                        wt_mapping = {
+                            "onsite": "1",
+                            "remote": "2",
+                            "hybrid": "3"
+                        }
+                        mapped_wts = [wt_mapping[wt] for wt in w_types if wt in wt_mapping]
+                        if mapped_wts:
+                            kwargs["params"]["f_WT"] = ",".join(mapped_wts)
+                            logger.info(f"Injecting LinkedIn Work Type filter: f_WT={kwargs['params']['f_WT']}")
+
+                return original_get(url, *args, **kwargs)
+
+            self.session.get = patched_get
+
+        jobspy.linkedin.LinkedIn.__init__ = patched_init
+        _patched = True
+        logger.info("Successfully monkeypatched JobSpy LinkedIn scraper for f_E and f_WT parameters")
+    except Exception as e:
+        logger.error(f"Failed to apply JobSpy monkeypatch: {e}")
+
+
 def scrape_linkedin(
     keywords: list[str],
     locations: list[str] | None = None,
     results_wanted: int = 25,
+    experience_levels: list[str] | None = None,
+    work_types: list[str] | None = None,
 ) -> list[dict]:
     """
     LinkedIn'den iş ilanlarını çeker (python-jobspy kütüphanesi ile).
@@ -22,6 +81,11 @@ def scrape_linkedin(
     """
     try:
         from jobspy import scrape_jobs
+        import jobspy.linkedin
+        _apply_monkeypatch()
+        # Set dynamic filters
+        jobspy.linkedin.LinkedIn._current_experience_levels = experience_levels
+        jobspy.linkedin.LinkedIn._current_work_types = work_types
     except ImportError:
         logger.error("python-jobspy kurulu değil! pip install python-jobspy")
         return []
