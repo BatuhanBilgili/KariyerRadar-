@@ -1,8 +1,31 @@
 "use client";
 
 import Link from "next/link";
+import { useState, useEffect } from "react";
+import { initSupabaseClient } from "@/lib/supabase";
 
 export default function SetupPage() {
+  const [supabaseUrl, setSupabaseUrl] = useState("");
+  const [supabaseAnonKey, setSupabaseAnonKey] = useState("");
+  const [isSaved, setIsSaved] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setSupabaseUrl(localStorage.getItem("talentRadar_supabaseUrl") || "");
+      setSupabaseAnonKey(localStorage.getItem("talentRadar_supabaseAnonKey") || "");
+    }
+  }, []);
+
+  const handleSaveDb = () => {
+    if (!supabaseUrl || !supabaseAnonKey) {
+      alert("Lütfen URL ve Anon Key giriniz.");
+      return;
+    }
+    initSupabaseClient(supabaseUrl, supabaseAnonKey);
+    setIsSaved(true);
+    setTimeout(() => setIsSaved(false), 3000);
+  };
+
   return (
     <>
       {/* Navbar */}
@@ -21,415 +44,153 @@ export default function SetupPage() {
 
       <div className="page-header">
         <div className="container container-narrow">
-          <h1 className="page-title">Kurulum Rehberi</h1>
+          <h1 className="page-title">Sistemi Bağla & Kurulum (BYOD)</h1>
           <p className="page-subtitle">
-            Adım adım KariyerRadarı&apos;nı kurun. Toplam süre: ~10 dakika. Tüm
-            araçlar tamamen ücretsizdir.
+            KariyerRadarı tamamen merkeziyetsizdir. Kendi Supabase veritabanınızı bağlayın ve 
+            otomasyon için GitHub hesabınızı kullanın. Sunucu masrafı sıfır!
           </p>
         </div>
       </div>
 
       <div className="page-content">
         <div className="container container-narrow">
+          
+          {/* Adım 0: DB Bağlantısı */}
+          <div className="card" style={{ marginBottom: "var(--space-3xl)", border: "2px solid var(--accent-primary)", padding: "var(--space-xl)" }}>
+            <h2 style={{ marginBottom: "var(--space-md)", color: "var(--accent-primary)" }}>1. Veritabanınızı Bağlayın</h2>
+            <p style={{ marginBottom: "var(--space-lg)", color: "var(--text-secondary)", fontSize: "0.95rem" }}>
+              Kendi Supabase projenizi açtıktan (aşağıdaki rehbere bakın) sonra URL ve Anon Key değerlerini buraya girin. 
+              Bu bilgiler sadece sizin tarayıcınızda (localStorage) şifrelenmeden tutulur, hiçbir sunucuya gitmez.
+            </p>
+            
+            <div className="form-group">
+              <label className="form-label" htmlFor="supabase-url">Supabase Project URL</label>
+              <input
+                id="supabase-url"
+                type="url"
+                className="form-input"
+                placeholder="https://[PROJE-ID].supabase.co"
+                value={supabaseUrl}
+                onChange={(e) => setSupabaseUrl(e.target.value)}
+              />
+            </div>
+            
+            <div className="form-group">
+              <label className="form-label" htmlFor="supabase-anon-key">Supabase Anon (Public) Key</label>
+              <input
+                id="supabase-anon-key"
+                type="password"
+                className="form-input"
+                placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                value={supabaseAnonKey}
+                onChange={(e) => setSupabaseAnonKey(e.target.value)}
+              />
+            </div>
+
+            <button onClick={handleSaveDb} className="btn btn-primary">
+              {isSaved ? "✓ Bağlandı ve Kaydedildi" : "Bağla ve Kaydet"}
+            </button>
+            
+            <div style={{ marginTop: "1rem", fontSize: "0.85rem", color: "var(--text-muted)" }}>
+              Bağladıktan sonra doğrudan <Link href="/dashboard/" style={{ color: "var(--accent-primary)" }}>Dashboard</Link>'a gidebilirsiniz.
+            </div>
+          </div>
+
           <div className="setup-steps">
-            {/* Adım 1: GitHub Fork */}
+            
+            {/* Adım 1: Supabase */}
             <div className="setup-step">
-              <h3 className="setup-step-title">GitHub&apos;dan Fork Edin</h3>
+              <h3 className="setup-step-title">Adım 1: Supabase Veritabanı Kurulumu</h3>
               <div className="setup-step-content">
                 <ol>
                   <li>
-                    <a
-                      href="https://github.com"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      KariyerRadarı GitHub sayfasına
-                    </a>{" "}
-                    gidin
+                    <a href="https://supabase.com" target="_blank" rel="noopener noreferrer">supabase.com</a> adresine gidin ve ücretsiz hesap açın.
+                  </li>
+                  <li><strong>"New Project"</strong> butonuna tıklayın. Proje adı: <code>KariyerRadari</code>, bölge: <strong>EU (Frankfurt)</strong> seçin.</li>
+                  <li>Sol menüden <strong>SQL Editor</strong>'e gidin.</li>
+                  <li>
+                    GitHub reposundaki <code>supabase/migrations/001_initial_schema.sql</code> dosyasının içeriğini kopyalayıp çalıştırın.
+                    *(Veya repodaki yeni eklenen SQL güncellemelerini de çalıştırın)*
                   </li>
                   <li>
-                    Sağ üstteki <strong>&quot;Fork&quot;</strong> butonuna tıklayın
+                    Sol menüden <strong>Project Settings → API</strong> bölümüne gidin.
                   </li>
-                  <li>Kendi hesabınıza fork oluşturun</li>
                   <li>
-                    Fork&apos;unuzu bilgisayarınıza klonlayın:{" "}
-                    <code>git clone https://github.com/KULLANICI/KariyerRadarı.git</code>
+                    <strong>Project URL</strong> ve <strong>anon (public) key</strong> değerlerini not edip yukarıdaki forma girin!
+                  </li>
+                  <li>
+                    Ayrıca <strong>service_role key</strong>'i de not edin (bu key bir sonraki adımda GitHub Actions'a eklenecek).
                   </li>
                 </ol>
               </div>
             </div>
 
-            {/* Adım 2: Supabase */}
+            {/* Adım 2: GitHub Fork */}
             <div className="setup-step">
-              <h3 className="setup-step-title">Supabase Veritabanı Kurulumu</h3>
+              <h3 className="setup-step-title">Adım 2: Arka Plan Görevi İçin GitHub Fork</h3>
               <div className="setup-step-content">
+                <p style={{ marginBottom: "1rem", color: "var(--text-secondary)" }}>
+                  Bu sitenin ilanları çekebilmesi için Python tabanlı Scraper'ın otomatik çalışması gerekir. Bunun için GitHub Actions kullanıyoruz.
+                </p>
                 <ol>
                   <li>
-                    <a
-                      href="https://supabase.com"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      supabase.com
-                    </a>{" "}
-                    adresine gidin ve ücretsiz hesap açın
+                    <a href="https://github.com/BatuhanBilgili/KariyerRadar-" target="_blank" rel="noopener noreferrer">
+                      KariyerRadarı GitHub
+                    </a> sayfasına gidin ve sağ üstteki <strong>"Fork"</strong> butonuna tıklayın.
                   </li>
                   <li>
-                    <strong>&quot;New Project&quot;</strong> butonuna tıklayın
+                    Fork'ladığınız kendi reponuzda <strong>Settings → Secrets and variables → Actions</strong> bölümüne gidin.
                   </li>
                   <li>
-                    Proje adı: <code>KariyerRadarı</code>, şifre belirleyin,
-                    bölge: <strong>EU (Frankfurt)</strong> seçin
+                    <strong>"New repository secret"</strong> diyerek aşağıdaki key'leri ekleyin:
+                    <ul>
+                      <li><code>SUPABASE_URL</code>: Supabase Project URL'iniz</li>
+                      <li><code>SUPABASE_SERVICE_ROLE_KEY</code>: Supabase service_role key (ASLA ARAYÜZE GİRMEYİN)</li>
+                      <li><code>TELEGRAM_BOT_TOKEN</code>: BotFather'dan aldığınız token (Aşağıdaki adıma bakın)</li>
+                      <li><code>GEMINI_API_KEY</code>: Google AI Studio API key (Aşağıdaki adıma bakın)</li>
+                    </ul>
                   </li>
                   <li>
-                    Sol menüden <strong>SQL Editor</strong>&apos;e gidin
-                  </li>
-                  <li>
-                    Projedeki{" "}
-                    <code>supabase/migrations/001_initial_schema.sql</code>{" "}
-                    dosyasının içeriğini kopyalayıp çalıştırın
-                  </li>
-                  <li>
-                    Sol menüden <strong>Settings → API</strong> bölümüne gidin
-                  </li>
-                  <li>
-                    <strong>Project URL</strong> ve <strong>anon (public) key</strong>{" "}
-                    değerlerini not edin
-                  </li>
-                  <li>
-                    Ayrıca <strong>service_role key</strong>&apos;i de not edin
-                    (bu key GitHub Actions secrets&apos;e eklenecek)
+                    Repo ana sayfanızdaki <strong>Actions</strong> sekmesine tıklayın ve "I understand my workflows, go ahead and enable them" butonuna basarak otomasyonu aktifleştirin.
                   </li>
                 </ol>
-                <div
-                  className="card"
-                  style={{
-                    marginTop: "var(--space-md)",
-                    padding: "var(--space-md)",
-                    borderColor: "rgba(245, 158, 11, 0.3)",
-                  }}
-                >
-                  <p style={{ fontSize: "0.85rem", color: "var(--accent-warning)" }}>
-                    service_role key çok güçlü bir anahtardır.
-                    Asla frontend kodunda kullanmayın! Sadece GitHub Actions
-                    secrets&apos;e ekleyin.
-                  </p>
-                </div>
               </div>
             </div>
 
             {/* Adım 3: Telegram */}
             <div className="setup-step">
-              <h3 className="setup-step-title">Telegram Bot Kurulumu</h3>
+              <h3 className="setup-step-title">Adım 3: Telegram Bot Kurulumu</h3>
               <div className="setup-step-content">
                 <ol>
+                  <li>Telegram'da <code>@BotFather</code> yazın ve <strong>/newbot</strong> komutuyla yeni bir bot oluşturun.</li>
+                  <li>BotFather'ın verdiği <strong>HTTP API Token</strong>'ı kopyalayın (GitHub Secrets'a eklenecek).</li>
                   <li>
-                    Telegram uygulamasını açın ve arama çubuğuna{" "}
-                    <code>@BotFather</code> yazın
+                    Chat ID'nizi öğrenmek için Telegram'da <code>@userinfobot</code> adlı bota <strong>/start</strong> yazın.
+                    Bu Chat ID'yi daha sonra <strong>Dashboard</strong>'daki ayarlara gireceksiniz.
                   </li>
-                  <li>
-                    BotFather&apos;ı açıp <strong>&quot;Start&quot;</strong> butonuna
-                    tıklayın
-                  </li>
-                  <li>
-                    <code>/newbot</code> komutunu gönderin
-                  </li>
-                  <li>
-                    Bot için bir ad girin (örn:{" "}
-                    <code>KariyerRadarı İş İlanları</code>)
-                  </li>
-                  <li>
-                    Bot için benzersiz bir kullanıcı adı girin (örn:{" "}
-                    <code>my_kariyerradari_bot</code>) — sonu <code>_bot</code>{" "}
-                    ile bitmeli
-                  </li>
-                  <li>
-                    BotFather size bir <strong>HTTP API Token</strong> verecek.
-                    Bu token&apos;ı kopyalayın
-                  </li>
-                </ol>
-
-                <h4 style={{ marginTop: "var(--space-lg)", marginBottom: "var(--space-sm)", fontSize: "1rem" }}>
-                  Chat ID&apos;nizi Öğrenin
-                </h4>
-                <ol>
-                  <li>
-                    Telegram&apos;da <code>@userinfobot</code> adlı botu arayın
-                  </li>
-                  <li>
-                    <code>/start</code> komutunu gönderin
-                  </li>
-                  <li>
-                    Bot size <strong>Chat ID</strong>&apos;nizi söyleyecek (örn:{" "}
-                    <code>123456789</code>)
-                  </li>
-                  <li>
-                    Son olarak, az önce oluşturduğunuz kendi botunuza gidin ve{" "}
-                    <code>/start</code> yazın (botu aktifleştirmek için gerekli)
-                  </li>
+                  <li>Kendi oluşturduğunuz bota gidip <strong>/start</strong> yazarak aktif edin.</li>
                 </ol>
               </div>
             </div>
 
             {/* Adım 4: Gemini */}
             <div className="setup-step">
-              <h3 className="setup-step-title">Gemini API Key (AI Özellikleri)</h3>
+              <h3 className="setup-step-title">Adım 4: Gemini API Key (AI Özellikleri)</h3>
               <div className="setup-step-content">
                 <ol>
-                  <li>
-                    <a
-                      href="https://aistudio.google.com"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      Google AI Studio
-                    </a>{" "}
-                    adresine gidin
-                  </li>
-                  <li>Google hesabınızla giriş yapın</li>
-                  <li>
-                    <strong>&quot;Get API Key&quot;</strong> butonuna tıklayın
-                  </li>
-                  <li>
-                    <strong>&quot;Create API Key&quot;</strong> → mevcut bir Google Cloud
-                    projesi seçin veya yeni oluşturun
-                  </li>
-                  <li>Oluşturulan API key&apos;i kopyalayın</li>
-                </ol>
-                <div
-                  className="card"
-                  style={{
-                    marginTop: "var(--space-md)",
-                    padding: "var(--space-md)",
-                    borderColor: "rgba(16, 185, 129, 0.3)",
-                  }}
-                >
-                  <p style={{ fontSize: "0.85rem", color: "var(--accent-success)" }}>
-                    Gemini API ücretsiz katmanda günde ~1500 istek ve 250K
-                    token/dakika kullanım hakkı sunar. İş ilanı özetleme ve CV
-                    oluşturma için fazlasıyla yeterli!
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Adım 5: Resend */}
-            <div className="setup-step">
-              <h3 className="setup-step-title">
-                Resend E-posta API (Opsiyonel)
-              </h3>
-              <div className="setup-step-content">
-                <p style={{ marginBottom: "var(--space-sm)" }}>
-                  E-posta bildirimi almak istiyorsanız:
-                </p>
-                <ol>
-                  <li>
-                    <a
-                      href="https://resend.com"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      resend.com
-                    </a>{" "}
-                    gidin ve ücretsiz hesap açın
-                  </li>
-                  <li>
-                    Dashboard&apos;tan <strong>API Key</strong> oluşturun
-                  </li>
-                  <li>
-                    Test aşamasında{" "}
-                    <code>onboarding@resend.dev</code> adresinden
-                    gönderebilirsiniz
-                  </li>
-                  <li>
-                    Kendi domain&apos;inizi doğrulamak isterseniz{" "}
-                    <strong>Domains</strong> bölümünden DNS ayarlarını yapın
-                  </li>
-                </ol>
-                <div
-                  className="card"
-                  style={{
-                    marginTop: "var(--space-md)",
-                    padding: "var(--space-md)",
-                    borderColor: "rgba(6, 182, 212, 0.3)",
-                  }}
-                >
-                  <p style={{ fontSize: "0.85rem", color: "var(--accent-secondary)" }}>
-                    Resend ücretsiz katman: Günde 100, ayda 3000 e-posta.
-                    Sadece Telegram kullanacaksanız bu adımı atlayabilirsiniz.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Adım 6: GitHub Actions Secrets */}
-            <div className="setup-step">
-              <h3 className="setup-step-title">
-                GitHub Actions Secrets Ayarlayın
-              </h3>
-              <div className="setup-step-content">
-                <ol>
-                  <li>
-                    Fork&apos;ladığınız GitHub repo&apos;suna gidin
-                  </li>
-                  <li>
-                    <strong>Settings → Secrets and variables → Actions</strong>{" "}
-                    bölümüne gidin
-                  </li>
-                  <li>
-                    <strong>&quot;New repository secret&quot;</strong> butonuyla aşağıdaki
-                    key&apos;leri ekleyin:
-                  </li>
-                </ol>
-                <div
-                  style={{
-                    marginTop: "var(--space-md)",
-                    overflowX: "auto",
-                  }}
-                >
-                  <table
-                    style={{
-                      width: "100%",
-                      borderCollapse: "collapse",
-                      fontSize: "0.85rem",
-                    }}
-                  >
-                    <thead>
-                      <tr
-                        style={{
-                          borderBottom: "1px solid var(--border-light)",
-                        }}
-                      >
-                        <th
-                          style={{
-                            textAlign: "left",
-                            padding: "var(--space-sm)",
-                            color: "var(--text-secondary)",
-                          }}
-                        >
-                          Secret Adı
-                        </th>
-                        <th
-                          style={{
-                            textAlign: "left",
-                            padding: "var(--space-sm)",
-                            color: "var(--text-secondary)",
-                          }}
-                        >
-                          Değer
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {[
-                        ["SUPABASE_URL", "Supabase Project URL"],
-                        ["SUPABASE_SERVICE_ROLE_KEY", "Supabase service_role key"],
-                        ["TELEGRAM_BOT_TOKEN", "BotFather'dan aldığınız token"],
-                        ["GEMINI_API_KEY", "Google AI Studio API key"],
-                        ["RESEND_API_KEY", "Resend API key (opsiyonel)"],
-                      ].map(([name, desc], i) => (
-                        <tr
-                          key={i}
-                          style={{
-                            borderBottom: "1px solid var(--border-subtle)",
-                          }}
-                        >
-                          <td
-                            style={{
-                              padding: "var(--space-sm)",
-                              fontFamily: "var(--font-mono)",
-                              color: "var(--accent-primary-light)",
-                            }}
-                          >
-                            {name}
-                          </td>
-                          <td
-                            style={{
-                              padding: "var(--space-sm)",
-                              color: "var(--text-secondary)",
-                            }}
-                          >
-                            {desc}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-
-            {/* Adım 7: Netlify Deploy */}
-            <div className="setup-step">
-              <h3 className="setup-step-title">Netlify&apos;a Deploy Edin</h3>
-              <div className="setup-step-content">
-                <ol>
-                  <li>
-                    <a
-                      href="https://app.netlify.com"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      Netlify
-                    </a>{" "}
-                    hesabı açın (GitHub ile giriş yapabilirsiniz)
-                  </li>
-                  <li>
-                    <strong>&quot;Add new site&quot; → &quot;Import an existing project&quot;</strong>
-                  </li>
-                  <li>GitHub&apos;dan fork&apos;unuzu seçin</li>
-                  <li>
-                    Build ayarları:
-                    <ul>
-                      <li>
-                        Base directory: <code>frontend</code>
-                      </li>
-                      <li>
-                        Build command: <code>npm run build</code>
-                      </li>
-                      <li>
-                        Publish directory: <code>frontend/out</code>
-                      </li>
-                    </ul>
-                  </li>
-                  <li>
-                    Environment variables bölümüne Supabase URL ve anon key
-                    ekleyin (opsiyonel)
-                  </li>
-                  <li>
-                    <strong>&quot;Deploy site&quot;</strong> butonuna tıklayın
-                  </li>
+                  <li><a href="https://aistudio.google.com" target="_blank" rel="noopener noreferrer">Google AI Studio</a> adresine gidin.</li>
+                  <li><strong>"Get API Key"</strong> butonuna tıklayıp yeni bir API Key oluşturun.</li>
+                  <li>Bu key'i hem GitHub Secrets'a (<code>GEMINI_API_KEY</code>) hem de <strong>Dashboard</strong>'daki Profil Bilgileri kısmına ekleyin.</li>
                 </ol>
               </div>
             </div>
 
-            {/* Adım 8: Test */}
-            <div className="setup-step">
-              <h3 className="setup-step-title">Test Edin</h3>
-              <div className="setup-step-content">
-                <ol>
-                  <li>
-                    GitHub repo&apos;nuzda{" "}
-                    <strong>Actions</strong> sekmesine gidin
-                  </li>
-                  <li>
-                    <strong>&quot;Scrape Jobs & Send Notifications&quot;</strong>{" "}
-                    workflow&apos;unu bulun
-                  </li>
-                  <li>
-                    <strong>&quot;Run workflow&quot;</strong> butonuyla manuel olarak
-                    tetikleyin
-                  </li>
-                  <li>Telegram&apos;dan ilk ilanlarınızı kontrol edin!</li>
-                </ol>
-              </div>
-            </div>
           </div>
 
           {/* Dashboard'a yönlendirme */}
           <div style={{ textAlign: "center", marginTop: "var(--space-3xl)" }}>
             <Link href="/dashboard/" className="btn btn-primary btn-lg">
-              Dashboard&apos;a Git
+              Kurulumu Tamamla ve Dashboard'a Git
             </Link>
           </div>
         </div>

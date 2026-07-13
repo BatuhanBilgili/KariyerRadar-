@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState, useCallback, useEffect, type KeyboardEvent, type ChangeEvent } from "react";
+import { isSupabaseConfigured } from "@/lib/supabase";
 import {
   PLATFORM_INFO,
   WORK_TYPE_INFO,
@@ -91,6 +93,7 @@ export default function DashboardPage() {
   const [oldCvText, setOldCvText] = useState("");
   const [showSaved, setShowSaved] = useState(false);
   const [testStatus, setTestStatus] = useState("");
+  const router = useRouter();
 
   // Tab state
   const [activeTab, setActiveTab] = useState<"settings" | "jobs">("settings");
@@ -98,6 +101,11 @@ export default function DashboardPage() {
   // Load from local storage
   useEffect(() => {
     if (typeof window !== "undefined") {
+      if (!isSupabaseConfigured()) {
+        router.push("/setup/");
+        return;
+      }
+
       setEmail(localStorage.getItem("tr_email") || "");
       setTelegramChatId(localStorage.getItem("tr_telegram_chat_id") || "");
       setNotifMethod((localStorage.getItem("tr_notif_method") as NotificationMethod) || "telegram");
