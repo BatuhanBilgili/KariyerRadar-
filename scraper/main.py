@@ -157,18 +157,22 @@ def process_user(client, user: dict):
         try:
             # İlanları çek
             if platform == "linkedin":
-                jobs = scraper_fn(
+                jobs = scrape_linkedin(
                     keywords=user_keywords,
                     locations=user_locations,
                     experience_levels=user_experience_levels,
                     work_types=user_work_types
                 )
             elif platform == "indeed":
-                jobs = scraper_fn(keywords=user_keywords, locations=user_locations)
-            else:
-                # İTÜ ve Boğaziçi
+                jobs = scrape_indeed(keywords=user_keywords, locations=user_locations)
+            elif platform == "itu":
                 univ_keywords = [] if fetch_all_univ else user_keywords
-                jobs = scraper_fn(keywords=univ_keywords)
+                jobs = scrape_itu(keywords=univ_keywords)
+            elif platform == "bogazici":
+                univ_keywords = [] if fetch_all_univ else user_keywords
+                jobs = scrape_bogazici(keywords=univ_keywords)
+            else:
+                jobs = []
 
             # Work type filtresi
             if user_work_types:
@@ -196,13 +200,27 @@ def process_user(client, user: dict):
                         if u_loc_lower == "turkey" and "türkiye" in job_loc:
                             match = True
                             break
-                        # Eğer kullanıcı remote_global seçmişse ve işin tipi remote ise konumdan bağımsız kabul et
-                        if remote_global and j.get("work_type") == "remote":
-                            match = True
-                            break
+                    # Eğer kullanıcı remote_global seçmişse ve işin tipi remote ise konumdan bağımsız kabul et
+                    if remote_global and j.get("work_type") == "remote":
+                        match = True
+                        
                     if match:
                         filtered_jobs.append(j)
                 jobs = filtered_jobs
+
+            # Kesin Kelime (Keyword) Filtresi (Arama kelimeleri dışındaki alakasız ilanları engellemek için)
+            if user_keywords:
+                strict_filtered = []
+                for j in jobs:
+                    # İTÜ ve Boğaziçi için 'fetch_all_univ' aktifse kelime filtresini es geç
+                    if fetch_all_univ and j.get("platform") in ("itu", "bogazici"):
+                        strict_filtered.append(j)
+                        continue
+                    
+                    title_desc = f"{j.get('title', '')} {j.get('description', '')}".lower()
+                    if any(kw.lower() in title_desc for kw in user_keywords):
+                        strict_filtered.append(j)
+                jobs = strict_filtered
 
             # İlanları DB'ye kaydet
             for job in jobs:
@@ -248,7 +266,7 @@ def process_user(client, user: dict):
                     idx += 1
 
     # Website/Dashboard URL'sini al ve ilanlara ekle
-    website_url = os.environ.get("WEBSITE_URL", "http://localhost:3000")
+    website_url = os.environ.get("WEBSITE_URL", "https://kariyerradari.netlify.app/")
     for platform_name in new_jobs_by_platform:
         for job in new_jobs_by_platform[platform_name]:
             job['cv_builder_url'] = f"{website_url.rstrip('/')}/cv-builder/?jobId={job['id']}"

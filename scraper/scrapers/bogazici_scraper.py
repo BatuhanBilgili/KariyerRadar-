@@ -106,6 +106,19 @@ def scrape_bogazici(keywords: list[str] | None = None) -> list[dict]:
                     )
                     company = company_el.get_text(strip=True) if company_el else None
 
+                    # Tarih filtresi (Son 24 saat)
+                    date_el = element.select_one(".date-display-single")
+                    posted_at = None
+                    if date_el and date_el.has_attr("content"):
+                        posted_at = date_el["content"]
+                        try:
+                            dt = datetime.fromisoformat(posted_at)
+                            # 1 günden eskiyse atla
+                            if (datetime.now(timezone.utc) - dt).days > 1:
+                                continue
+                        except Exception:
+                            pass
+
                     job = {
                         "id": str(uuid.uuid4()),
                         "platform": "bogazici",
@@ -116,7 +129,7 @@ def scrape_bogazici(keywords: list[str] | None = None) -> list[dict]:
                         "url": url,
                         "description": None,
                         "external_id": f"bogazici_{_hash_text(title + (company or ''))}",
-                        "posted_at": None,
+                        "posted_at": posted_at,
                         "scraped_at": datetime.now(timezone.utc).isoformat(),
                     }
                     all_jobs.append(job)

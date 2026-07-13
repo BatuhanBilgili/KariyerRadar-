@@ -39,7 +39,7 @@ def scrape_itu(keywords: list[str] | None = None) -> list[dict]:
         logger.info("İTÜ Arı Teknokent ilanları çekiliyor...")
         time.sleep(1)  # Rate limiting — sunucuyu yormamak için
 
-        response = requests.get(SCRAPE_URL, headers=HEADERS, timeout=30)
+        response = requests.get(SCRAPE_URL, params={"date": "0"}, headers=HEADERS, timeout=30)
         response.raise_for_status()
         response.encoding = "utf-8"
 
