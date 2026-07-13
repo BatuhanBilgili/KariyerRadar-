@@ -601,19 +601,18 @@ export default function DashboardPage() {
                   {/* Tüm Üniversite İlanları */}
                   {(platforms.includes("itu") || platforms.includes("bogazici")) && (
                     <div className="form-group" style={{ marginTop: "1rem" }}>
-                      <div className="checkbox-item" style={{ alignItems: "flex-start", background: "rgba(100,200,255,0.1)", padding: "10px", borderRadius: "8px" }}>
+                      <label style={{ display: "flex", gap: "12px", alignItems: "flex-start", background: "var(--bg-glass)", padding: "16px", borderRadius: "var(--radius-lg)", border: "1px solid var(--border-light)", cursor: "pointer", transition: "all 0.2s" }}>
                         <input
                           type="checkbox"
-                          id="fetch-all-univ"
                           checked={fetchAllUniv}
                           onChange={(e) => setFetchAllUniv(e.target.checked)}
-                          style={{ marginTop: "4px" }}
+                          style={{ marginTop: "2px", width: "20px", height: "20px", cursor: "pointer", accentColor: "var(--accent-primary)", flexShrink: 0 }}
                         />
-                        <label className="checkbox-label" htmlFor="fetch-all-univ" style={{ fontSize: "0.9rem", lineHeight: "1.4" }}>
-                          <strong>Üniversite Portallarındaki (İTÜ, Boğaziçi) Tüm Yeni İlanları Getir</strong><br/>
-                          <span style={{ opacity: 0.8, fontSize: "0.8rem" }}>Bu seçenek aktifken, İTÜ ve Boğaziçi'ndeki tüm taze fırsatlar arama kelimenize bakılmaksızın (filtresiz) getirilir. LinkedIn ve Indeed için arama kelimeleriniz geçerli olmaya devam eder.</span>
-                        </label>
-                      </div>
+                        <div style={{ flex: 1 }}>
+                          <strong style={{ display: "block", color: "var(--text-primary)", marginBottom: "6px", fontSize: "0.95rem" }}>Üniversite Portallarındaki (İTÜ, Boğaziçi) Tüm Yeni İlanları Getir</strong>
+                          <span style={{ color: "var(--text-secondary)", fontSize: "0.85rem", lineHeight: "1.5", display: "block" }}>Bu seçenek aktifken, İTÜ ve Boğaziçi'ndeki tüm taze fırsatlar arama kelimenize bakılmaksızın (filtresiz) getirilir. LinkedIn ve Indeed için arama kelimeleriniz geçerli olmaya devam eder.</span>
+                        </div>
+                      </label>
                     </div>
                   )}
 
@@ -661,7 +660,20 @@ export default function DashboardPage() {
                         value={locationInput}
                         onChange={(e) => setLocationInput(e.target.value)}
                         onKeyDown={handleLocationKeyDown}
+                        list="location-suggestions"
                       />
+                      <datalist id="location-suggestions">
+                        <option value="Türkiye" />
+                        <option value="İstanbul" />
+                        <option value="Ankara" />
+                        <option value="İzmir" />
+                        <option value="Remote" />
+                        <option value="Hybrid" />
+                        <option value="Europe" />
+                        <option value="United States" />
+                        <option value="United Kingdom" />
+                        <option value="Germany" />
+                      </datalist>
                     </div>
                   </div>
 
