@@ -177,6 +177,30 @@ def process_user(client, user: dict):
                     or j.get("work_type") == "unknown"
                 ]
 
+            # Konum filtresi (LinkedIn ve Indeed için "diğer alanlardan ilanlar"ı temizlemek için)
+            if platform in ("linkedin", "indeed") and user_locations:
+                filtered_jobs = []
+                for j in jobs:
+                    job_loc = str(j.get("location", "")).lower()
+                    match = False
+                    for u_loc in user_locations:
+                        u_loc_lower = u_loc.lower().strip()
+                        if u_loc_lower in job_loc:
+                            match = True
+                            break
+                        if u_loc_lower == "türkiye" and "turkey" in job_loc:
+                            match = True
+                            break
+                        if u_loc_lower == "turkey" and "türkiye" in job_loc:
+                            match = True
+                            break
+                        if u_loc_lower == "remote" and j.get("work_type") == "remote":
+                            match = True
+                            break
+                    if match:
+                        filtered_jobs.append(j)
+                jobs = filtered_jobs
+
             # İlanları DB'ye kaydet
             for job in jobs:
                 upsert_job_listing(client, job)
