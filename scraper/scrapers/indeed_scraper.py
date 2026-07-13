@@ -45,35 +45,35 @@ def scrape_indeed(
 
                 if jobs_df is None or jobs_df.empty:
                     logger.info(f"Indeed'de '{keyword}' ({loc or 'Global'}) için sonuç bulunamadı.")
+                    continue
+
+                for _, row in jobs_df.iterrows():
+                    job = {
+                        "id": str(uuid.uuid4()),
+                        "platform": "indeed",
+                        "title": str(row.get("title", "")).strip(),
+                        "company": str(row.get("company", "")).strip() or None,
+                        "location": str(row.get("location", "")).strip() or None,
+                        "work_type": _detect_work_type(row),
+                        "url": str(row.get("job_url", "")).strip() or None,
+                        "description": str(row.get("description", "")).strip() or None,
+                        "external_id": str(
+                            row.get("id", row.get("job_url", str(uuid.uuid4())))
+                        ).strip(),
+                        "posted_at": _parse_date(row.get("date_posted")),
+                        "scraped_at": datetime.now(timezone.utc).isoformat(),
+                    }
+
+                    if job["title"]:
+                        all_jobs.append(job)
+
+                logger.info(
+                    f"Indeed'de '{keyword}' (Konum: {loc or 'Global'}) için {len(jobs_df)} ilan bulundu."
+                )
+
+            except Exception as e:
+                logger.error(f"Indeed scraping hatası ('{keyword}', Konum: {loc}): {e}")
                 continue
-
-            for _, row in jobs_df.iterrows():
-                job = {
-                    "id": str(uuid.uuid4()),
-                    "platform": "indeed",
-                    "title": str(row.get("title", "")).strip(),
-                    "company": str(row.get("company", "")).strip() or None,
-                    "location": str(row.get("location", "")).strip() or None,
-                    "work_type": _detect_work_type(row),
-                    "url": str(row.get("job_url", "")).strip() or None,
-                    "description": str(row.get("description", "")).strip() or None,
-                    "external_id": str(
-                        row.get("id", row.get("job_url", str(uuid.uuid4())))
-                    ).strip(),
-                    "posted_at": _parse_date(row.get("date_posted")),
-                    "scraped_at": datetime.now(timezone.utc).isoformat(),
-                }
-
-                if job["title"]:
-                    all_jobs.append(job)
-
-            logger.info(
-                f"Indeed'de '{keyword}' için {len(jobs_df)} ilan bulundu."
-            )
-
-        except Exception as e:
-            logger.error(f"Indeed scraping hatası ('{keyword}'): {e}")
-            continue
 
     seen = set()
     unique_jobs = []
